@@ -1,0 +1,5 @@
+[system]
+BOT_API = _insert_your_code_here_
+AUDIO_DIR = mp3
+DB_WRITE_COMMANDS = requests.log
+URL_WITH_AUDIO = https://wooordhunt.ru/data/sound/word/us/mp3/
