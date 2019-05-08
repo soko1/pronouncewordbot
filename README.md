@@ -25,6 +25,8 @@ nullbsd@gmail.com (email)
 
 # Donate
 
+Paypal: mathematics1688@gmail.com
+
 Bitcoin: `1NYYFoJiRPnkmFbcv5kYLqwsweix1cVmBT`
 
 (Webmoney)
