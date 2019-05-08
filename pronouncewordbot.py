@@ -17,6 +17,8 @@ nullbsd@gmail.com (email)
 
 # Donate
 
+Paypal: mathematics1688@gmail.com
+
 Bitcoin: 1NYYFoJiRPnkmFbcv5kYLqwsweix1cVmBT
 
 (Webmoney)
@@ -73,6 +75,8 @@ It's empty :)
 
     donate = """
 If you want to give thanks buying me a cup of coffee (which I'm really fond of!) — you're welcome:
+
+Paypal: mathematics1688@gmail.com
 
 Bitcoin: `1NYYFoJiRPnkmFbcv5kYLqwsweix1cVmBT`
 
