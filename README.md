@@ -1,4 +1,4 @@
-This is a telegram bot for learning english.
+**pronouncewordbot** is a telegram bot for learning english.
 Type the word and get back an audio file with it's pronunciation.
 
 Get this code: https://github.com/soko1/pronouncewordbot
