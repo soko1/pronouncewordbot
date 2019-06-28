@@ -18,6 +18,11 @@ $ ./pronouncewordbot.py
 
 [@Pronouncewordbot](https://t.me/Pronouncewordbot)
 
+# My other bots for learning English
+
+[@beganbegunbot](https://t.me/beganbegunbot) ([source code](https://github.com/soko1/beganbegunbot)) - Type any form of an irregular (!) verb and get back all three forms together.
+
+
 # Contacts
 
 @gnupg (telegram)
