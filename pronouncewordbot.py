@@ -1,189 +1,137 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-This is a telegram bot for learning english.
-Type the word and get back an audio file with it's pronunciation.
 
-Get this code: https://github.com/soko1/pronouncewordbot
-
-# Bot in action
-
-https://t.me/Pronouncewordbot
-
-# Contacts
-
-nullbsd@gmail.com (email)
-
-# Donate
-
-Bitcoin: bc1qs7v6vfp0xpe2slcpwlhftdeqj2w92r3pkykjn6
-
-"""
-
-
-from __future__ import unicode_literals
-import os
-import os.path
-import re
-import configparser
 import asyncio
+import re
+import os
+import configparser
 import requests
-import telepot.aio
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import Command
+from aiogram.types import Message, FSInputFile
 
-CONFIG = configparser.ConfigParser()
-CONFIG.read("config.ini")
+# --- Конфиг ---
+config = configparser.ConfigParser()
+config.read("config.ini")
 
-AUDIO_DIR = CONFIG['system']['AUDIO_DIR']
-URL_WITH_AUDIO = CONFIG['system']['URL_WITH_AUDIO']
+BOT_TOKEN = config['system']['BOT_API']
+AUDIO_DIR = config['system']['AUDIO_DIR']
+DB_LOG = config['system']['DB_WRITE_COMMANDS']
 
-
-# защита от повторного запуска
-CHECKPROC = os.popen("ps aux | grep %s" % __file__).read()
-if CHECKPROC.count("python") > 1:
+# --- Проверка на повторный запуск ---
+if os.popen(f"ps aux | grep {__file__} | grep -v grep").read().count("python") > 1:
     print("The bot is already running")
-    os._exit(1)
+    exit(1)
 
-async def main(msg):
-    """
-    blabla
-    """
+# --- Создание папки для аудио ---
+os.makedirs(AUDIO_DIR, exist_ok=True)
 
-    chat_id = msg['chat']['id']
-    command = msg['text']
+# --- Лог-файл ---
+log_file = open(DB_LOG, 'a', encoding='utf-8')
 
-    help = """
-Type the word and get back an audio file with its pronounciation.
+# --- Aiogram ---
+bot = Bot(token=BOT_TOKEN)
+dp = Dispatcher()
 
-If there are some words missing or you have an idea of improving the bot — be sure to contact me (@gnupg) and  you'll appear (if you wish) here on the list of supporters — /thanks
+# --- Тексты ---
+HELP_TEXT = """
+Type the word and get back an audio file with its pronunciation.
 
-You can also thank me by giving a positive feedback or buy me a cup of coffee here — /donate
-"""
+If the word is missing or you have ideas — write to @rogork
+/thanks — supporters
+/donate — support the developer
+""".strip()
 
-    thanks = """
-Thanks:
+THANKS_TEXT = "Thanks:\nIt's empty :)".strip()
 
-It's empty :)
-"""
+DONATE_TEXT = """
+Support the developer:
+https://sakaloucv.github.io/donate
 
-    donate = """
-If you want to give thanks buying me a cup of coffee (which I'm really fond of!) — you're welcome:
+telegram: @rogork
+""".strip()
 
-Paypal: mathematics1688@gmail.com
+# --- Команды ---
+@dp.message(Command("start", "help"))
+async def cmd_help(message: Message):
+    await message.answer(HELP_TEXT)
 
-Bitcoin: `1NYYFoJiRPnkmFbcv5kYLqwsweix1cVmBT`
+@dp.message(Command("thanks"))
+async def cmd_thanks(message: Message):
+    await message.answer(THANKS_TEXT)
 
-(Webmoney)
-WMZ: `Z156396869707`
-WMR: `R409106892241`
-WME: `E320058433666`
+@dp.message(Command("donate"))
+async def cmd_donate(message: Message):
+    await message.answer(DONATE_TEXT, parse_mode="Markdown")
 
-Any other way: email me at nullbsd@gmail.com or write back here on Telegram @gnupg
+@dp.message(Command("count"))
+async def cmd_count(message: Message):
+    try:
+        with open(DB_LOG, 'r', encoding='utf-8') as f:
+            content = f.read()
+        users = len(set(re.findall(r'(\d+):', content)))
+        await message.answer(f"Кол-во уникальных пользователей: {users}")
+    except Exception as e:
+        await message.answer(f"Ошибка: {e}")
 
-Thanks!
-"""
+# --- Основной обработчик ---
+@dp.message()
+async def handle_word(message: Message):
+    text = message.text.strip()
+    chat_id = message.chat.id
 
-    # вывод справки
-    if command.find("/start") != -1:
-        await BOT.sendMessage(chat_id, help)
+    # Фильтр: только буквы, цифры, пробелы
+    match = re.search(r'[\w ]+', text)
+    if not match:
+        await message.answer(HELP_TEXT)
         return
-    if command.find("/help") != -1:
-        await BOT.sendMessage(chat_id, help)
-        return
-    # доска почёта
-    if command.find("/thanks") != -1:
-        await BOT.sendMessage(chat_id, thanks)
-        return
-    # пожертвования
-    if command.find("/donate") != -1:
-        await BOT.sendMessage(chat_id, donate, parse_mode='Markdown')
-        return
-    # кол-во уникальных пользователей (незадокументированная команда)
-    if command.find("/count") != -1:
-        logfile = open(CONFIG['system']['DB_WRITE_COMMANDS'], 'r')
-        logfile_content = logfile.read()
-        logfile.close()
-        num_of_uniq_users = len(set(re.findall(r'd+:', logfile_content)))
-        await BOT.sendMessage(chat_id, 'Кол-во уникальных пользователей: ' + str(num_of_uniq_users))
+
+    word = match.group().lower()
+    if len(word) < 2 or len(word) > 30:
+        await message.answer(HELP_TEXT)
         return
 
-    # отсеивание мусора из спецсимволов
-    search_letters = re.search(r'[\w ]+', command)
-    if search_letters:
-        command = search_letters.group()
+    # Берём только первое слово
+    word = word.split()[0]
+
+    # Логируем
+    print(f"{chat_id}: {word}", file=log_file, flush=True)
+
+    # Путь к файлу
+    audio_path = os.path.join(AUDIO_DIR, f"{word}.mp3")
+
+    # Если файла нет — скачиваем
+    if not os.path.exists(audio_path):
+        url = f"https://wooordhunt.ru/data/sound/sow/us/{word}.mp3"
+        try:
+            r = requests.get(url, timeout=10, verify=False)
+            if r.status_code == 200 and 'audio/mpeg' in r.headers.get('Content-Type', ''):
+                with open(audio_path, 'wb') as f:
+                    f.write(r.content)
+        except Exception as e:
+            print(f"Ошибка скачивания {word}: {e}")
+
+    # Если файл есть — отправляем
+    if os.path.exists(audio_path):
+        audio = FSInputFile(audio_path)
+        await message.answer_voice(audio)
     else:
-        await BOT.sendMessage(chat_id, help)
-        return
+        await message.answer(
+            f"The word *{word}* is not found in the database.\n"
+            "Write @rogork if you think it's a mistake.\n"
+            "/help — more info",
+            parse_mode="Markdown"
+        )
 
-    # отсеивание сообщений менее 2 символов и более 30
-    command_len = len(command)
-    if command_len < 2 or command_len > 30:
-        await BOT.sendMessage(chat_id, help)
-        return
+# --- Запуск ---
+async def main():
+    print("PronounceWordBot запущен...")
+    await dp.start_polling(bot)
 
-    # полученная строка
-    string = command.lower()
-    # разделяем на пробелы
-    string = string.split(" ")
-    # берём первое слово
-    word = string[0]
-
-    # запись лога с присланными сообщениями
-    LOG.write("%s: %s\n" % (chat_id, word))
-    LOG.flush()
-
-    # путь к звуковому файлу
-    audio_file_path = AUDIO_DIR + '/' + word + '.mp3'
-
-    # если файл отсутствует на ФС
-    if os.path.exists(audio_file_path) is False:
-        # пытаемся найти слово в базе wooordhunt.ru
-        fullurl = URL_WITH_AUDIO + word + '.mp3'
-
-        request = requests.get(fullurl)
-
-        # запрос сработал
-        if request.status_code == 200:
-            # проверка на аудифайл
-            if 'audio/mpeg' in request.headers['Content-Type']:
-                file = open(audio_file_path, 'wb')
-                # пополняем локальную базу
-                file.write(request.content)
-                file.close()
-
-    # если файл присутствует на ФС
-    if os.path.exists(audio_file_path) is True:
-        file = open(audio_file_path, 'rb')
-        # отправляем пользователю
-        await BOT.sendVoice(chat_id, file)
-        file.close()
-    else:
-        # иначе присылаем
-        message_for_send = """
-The word *%s* is not found in a database.
-If you find it wrong, then be sure to contact me — @gnupg
-
-Get more info — /help""" % word
-        await BOT.sendMessage(chat_id, message_for_send, parse_mode='Markdown')
-        return
-
-# активация бота
-BOT = telepot.aio.Bot(CONFIG['system']['BOT_API'])
-
-# создание списка задач
-LOOP = asyncio.get_event_loop()
-LOOP.create_task(BOT.message_loop({'chat': main}))
-
-print('Listening ...')
-
-
-LOG = open(CONFIG['system']['DB_WRITE_COMMANDS'], 'a')
-print("read file for write")
-
-
-try:
-    LOOP.run_forever()
-except KeyboardInterrupt:
-    pass
-finally:
-    LOOP.stop()
-    LOOP.close()
+if __name__ == '__main__':
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\nБот остановлен.")
+    finally:
+        log_file.close()
