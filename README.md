@@ -25,8 +25,8 @@ $ ./pronouncewordbot.py
 
 # Contacts
 
-nullbsd@gmail.com (email)
+tubby-primate-yarn@duck.com (email)
 
 # Donate
 
-Bitcoin: `bc1qs7v6vfp0xpe2slcpwlhftdeqj2w92r3pkykjn6`
+https://sakaloucv.github.io/donate
